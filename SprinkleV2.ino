@@ -3,6 +3,7 @@
 #include "LSM6.h"
 #include "ICM20.h"
 #include "GPS.h"
+#include "XTSD.h"
 
 #include "DataPacket.h"
 
@@ -21,6 +22,7 @@ TaskHandle_t lps22_handle = NULL;
 TaskHandle_t lsm6_handle = NULL;
 TaskHandle_t icm20_handle = NULL;
 TaskHandle_t gps_handle = NULL;
+TaskHandle_t sd_handle = NULL;
 
 // Task 1 - Pressure Sensor MS8607
 // Uses about 1692 words in stack
@@ -167,6 +169,27 @@ void gps_task(void *pvParameters) {
   }
 }
 
+//Task 6 - esp32 microsd card write
+// Currently using ???? words in stack //TODO: Track stack size
+void sd_task(void *pvParameters) {
+  DataPacket *p_data = (DataPacket *)pvParameters;
+  for (;;) {
+    //NOTE: we shouldn't need to take the mutex to write since all we'll be doing is reading
+    Serial.print("SD running on core: ");
+    Serial.println(xPortGetCoreID());
+
+    bool succ_write = writeXTSD(p_data);
+
+    // Leave in to observe as peripherals are added
+    Serial.print("# of words in stack currently used: ");
+    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+
+    Serial.println("SD Write Status: ", (succ_write) ? "Success" : "Failed");
+
+    vTaskDelay(pdMS_TO_TICKS(10)); //NOTE: XTSD has 50Mhz Clock. Don't write faster than that
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Beginning Sprinkle");
@@ -175,6 +198,7 @@ void setup() {
   setupLSM6();
   setupICM20();
   setupGPS();
+  setupXTSD();
 
   mutex = xSemaphoreCreateMutex();
 
@@ -231,6 +255,16 @@ void setup() {
     1,             // Priority
     &gps_handle,  // Task handle
     0              // Core to run on (Core 0)
+  );
+
+  xTaskCreatePinnedToCore(
+    sd_task,              //Function To Execute
+    "SD Flash Task",      //Name of the task
+    6666,                 //Stack size (words) //TODO: Determine actual size
+    &data,                //Task Parameters
+    0,                    //Priority
+    &sd_handle,           //Task Handle
+    1                     //Core to run on (Core 1)
   );
 }
 
