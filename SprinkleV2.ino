@@ -4,6 +4,7 @@
 #include "ICM20.h"
 #include "GPS.h"
 #include "XTSD.h"
+#include "STGSCHD.h"
 
 #include "DataPacket.h"
 
@@ -23,6 +24,7 @@ TaskHandle_t lsm6_handle = NULL;
 TaskHandle_t icm20_handle = NULL;
 TaskHandle_t gps_handle = NULL;
 TaskHandle_t sd_handle = NULL;
+TaskHandle_t sched_handle = NULL;
 
 // Task 1 - Pressure Sensor MS8607
 // Uses about 1692 words in stack
@@ -192,6 +194,23 @@ void sd_task(void *pvParameters) {
   }
 }
 
+void sched_task(void *pvParameters) {
+  DataPacket *p_data = (DataPacket *)pvParameters;
+  for (;;) {
+    // NOTE: we don't need to take mutex once again, we're only reading
+    Serial.print("Scheulder running on core: ");
+    Serial.println(xPortGetCoreID());
+
+    stepScheduler(p_data);
+    
+    // Leave in to observe as peripherals are added
+    Serial.print("SD # of words in stack currently used: ");
+    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Beginning Sprinkle");
@@ -201,6 +220,7 @@ void setup() {
   setupICM20();
   setupGPS();
   setupXTSD();
+  setupScheduler();
 
   mutex = xSemaphoreCreateMutex();
 
@@ -267,6 +287,16 @@ void setup() {
     1,                    //Priority
     &sd_handle,           //Task Handle
     1                     //Core to run on (Core 1)
+  );
+
+  xTaskCreatePinnedToCore(
+    scheduler,
+    "Stage Scheduling Task",
+    6666,
+    &data,
+    0,
+    &sched_handle,
+    1
   );
 }
 
