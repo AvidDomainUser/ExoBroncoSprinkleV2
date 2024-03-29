@@ -4,10 +4,12 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
-#include <cstdio>
 #include "DataPacket.h"
 
+void writeFile(fs::FS &fs, const char * path, const char * message);
+void appendFile(fs::FS &fs, const char * path, const char * message);
 void setupXTSD();
-bool writeXTSD(DataPacket* pData);
+String formatDataPacket(DataPacket* packet);
+void writeXTSD(DataPacket* pData);
 
 #endif

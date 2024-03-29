@@ -42,7 +42,7 @@ void ms8607_task(void *pvParameters) {
       Serial.print("Pressure: "); Serial.println(p_data->ms8607_press);
 
       // Leave in to observe as peripherals are added
-      Serial.print("# of words in stack currently used: ");
+      Serial.print("MS8607 # of words in stack currently used: ");
       Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
       xSemaphoreGive(mutex); // Release the mutex
@@ -101,7 +101,7 @@ void lsm6_task(void *pvParameters) {
       Serial.print("LSM Gz: "); Serial.println(p_data->lsm_gyro[2]);
 
       // Leave in to observe as peripherals are added
-      Serial.print("# of words in stack currently used: ");
+      Serial.print("LSM6 # of words in stack currently used: ");
       Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
       xSemaphoreGive(mutex); // Release the mutex
@@ -133,7 +133,7 @@ void icm20_task(void *pvParameters) {
       Serial.print("ICM Gz: "); Serial.println(p_data->icm_gyro[2]);
 
       // Leave in to observe as peripherals are added
-      Serial.print("# of words in stack currently used: ");
+      Serial.print("ICM20 # of words in stack currently used: ");
       Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
       xSemaphoreGive(mutex); // Release the mutex
@@ -159,7 +159,7 @@ void gps_task(void *pvParameters) {
       Serial.print("Altitude: "); Serial.println(p_data->altitude);
 
       // Leave in to observe as peripherals are added
-      Serial.print("# of words in stack currently used: ");
+      Serial.print("GPS # of words in stack currently used: ");
       Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
       xSemaphoreGive(mutex); // Release the mutex
@@ -170,23 +170,25 @@ void gps_task(void *pvParameters) {
 }
 
 //Task 6 - esp32 microsd card write
-// Currently using ???? words in stack //TODO: Track stack size
+// Currently using 47412 words in stack 20240328
 void sd_task(void *pvParameters) {
   DataPacket *p_data = (DataPacket *)pvParameters;
   for (;;) {
-    //NOTE: we shouldn't need to take the mutex to write since all we'll be doing is reading
-    Serial.print("SD running on core: ");
-    Serial.println(xPortGetCoreID());
+    // NOTE: we shouldn't need to take the mutex to write since all we'll be doing is reading
+    //if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+      Serial.print("SD running on core: ");
+      Serial.println(xPortGetCoreID());
 
-    bool succ_write = writeXTSD(p_data);
+      writeXTSD(p_data);
 
-    // Leave in to observe as peripherals are added
-    Serial.print("# of words in stack currently used: ");
-    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+      // Leave in to observe as peripherals are added
+      Serial.print("SD # of words in stack currently used: ");
+      Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
-    Serial.println("SD Write Status: ", (succ_write) ? "Success" : "Failed");
+      //xSemaphoreGive(mutex); // Release the mutex
 
-    vTaskDelay(pdMS_TO_TICKS(10)); //NOTE: XTSD has 50Mhz Clock. Don't write faster than that
+      vTaskDelay(pdMS_TO_TICKS(10)); //NOTE: XTSD has 50Mhz Clock. Don't write faster than that
+    //}
   }
 }
 
@@ -247,22 +249,22 @@ void setup() {
   );
 
   // GPS Task
-  xTaskCreatePinnedToCore(
-    gps_task,         // Function to execute
-    "GPS Task",       // Name of the task
-    6000,          // Stack size (words)
-    &data,          // Task parameters
-    1,             // Priority
-    &gps_handle,  // Task handle
-    0              // Core to run on (Core 0)
-  );
+  // xTaskCreatePinnedToCore(
+  //   gps_task,         // Function to execute
+  //   "GPS Task",       // Name of the task
+  //   6000,          // Stack size (words)
+  //   &data,          // Task parameters
+  //   1,             // Priority
+  //   &gps_handle,  // Task handle
+  //   0              // Core to run on (Core 0)
+  // );
 
   xTaskCreatePinnedToCore(
     sd_task,              //Function To Execute
     "SD Flash Task",      //Name of the task
-    6666,                 //Stack size (words) //TODO: Determine actual size
+    75000,                 //Stack size (words) 
     &data,                //Task Parameters
-    0,                    //Priority
+    1,                    //Priority
     &sd_handle,           //Task Handle
     1                     //Core to run on (Core 1)
   );

@@ -2,8 +2,8 @@
 #define DATAPACKET_H
 
 struct DataPacket {
-  volatile String timestamp = "";
-  volatile String datestamp = "";
+  String timestamp = "";
+  String datestamp = "";
   volatile float ms8607_temp = 0.0;
   volatile float ms8607_press = 0.0;
   volatile float ms8607_humid = 0.0;
