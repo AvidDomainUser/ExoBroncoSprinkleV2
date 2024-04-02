@@ -290,7 +290,7 @@ void setup() {
   );
 
   xTaskCreatePinnedToCore(
-    scheduler,
+    sched_task,
     "Stage Scheduling Task",
     6666,
     &data,
