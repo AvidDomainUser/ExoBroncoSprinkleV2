@@ -2,44 +2,42 @@
 
 //TODO: Abort Schedule/Sequence?
 struct Stage schedule[MAX_STAGES];
+BoardType attached_to = BOOSTER;
 unsigned int stage_count = 0; //amount of stages scheduled
 unsigned int stage_index = 0; //current stage
 
-typedef enum Stage_Action Action;
-typedef enum Stage_Trigger Trigger;
-
-void add_stage(Trigger it = ST_NONE, float ic = 0, Trigger at = ST_NONE, float ac = 0, Action act = SA_NONE_OPER) {
+void add_stage(StageTrigger initial = ST_NONE, float initcond = 0, StageTrigger abort = ST_NONE, float abortcond = 0, Action act = SA_NONE_OPER) {
 	if (stage_count > MAX_STAGES) Serial.println("ERROR: COULD NOT FULLY ALLOCATE SCHEDULER!!!"), return;
 
 	schedule[stage_count++] = {
-		.i_trig = it,
-		.i_cond = ic,
+		.trigger = initial,
+		.trigger_condition = initcond,
 
-		.a_trig = at,
-		.a_cond = ac,
+		.abort_trigger = abort,
+		.abort_condition = abortcond,
 
 		.action = act,
 	}
 }
 
-bool test_trigger(DataPacket *pData, Trigger tt, float cond) {
+bool test_trigger(DataPacket *pData, StageTrigger tt, float cond) {
 	switch (tt) {
-		case ST_NONE:
+		case TRIG_NO_TRIG:
 			return true;
-		case ST_MANU:
+		case TRIG_MANUAL:
 			Serial.println("TODO! ST_MANU test_trigger");
 			//idk how to check the correct pins :sob:
 			return false;
-		case ST_CDWN:
+		case TRIG_COUNTDOWN:
 			Serial.println("TODO! ST_CDWN test_trigger");
 			//idk how to do this bc timers are weird
 			//also we might have leds to flash?
 			return false;
-		case ST_ALTI:
+		case TRIG_ALTITUDE:
 			return pData->altitude >= cond;
-		case ST_AVEL:
+		case TRIG_ABS_VELOCITY:
 			return pData->speed >= cond;
-		case ST_AACC:
+		case TRIG_ABS_ACCELERATION:
 			float accel_avg[3];
 			accel_avg[0] = pData->lsm_accel[0] + pData->icm_accl[0];
 			accel_avg[1] = pData->lsm_accel[1] + pData->icm_accl[1];
@@ -47,9 +45,9 @@ bool test_trigger(DataPacket *pData, Trigger tt, float cond) {
 
 			float total_avg = sqrtf(powf(accel_avg[0], 2) + powf(accel_avg[1], 2) + powf(accel_avg[2], 2));
 			return total_avg >= cond;
-		case ST_ROTH: //TODO: make this a better horizontal indicator
+		case TRIG_NOT_VERTICAL: //TODO: make this a better horizontal indicator
 			float gyro_avg[3];
-			gyro_avg[0] = pData->lsm_gyro[0] + pData->icm_gyro[0];
+			gyro_avg[0] = pData->lsm_gyro[0] + pData->icm_gyro[0]; //TODO: what is vertical?
 			gyro_avg[1] = pData->lsm_gyro[1] + pData->icm_gyro[1];
 			gyro_avg[2] = pData->lsm_gyro[2] + pData->icm_gyro[2];
 
@@ -61,32 +59,25 @@ bool test_trigger(DataPacket *pData, Trigger tt, float cond) {
 	return false;
 }
 
-bool complete_action(Action act) {
+bool complete_action(StageAction act) {
+	//TODO: Please take not of the attached_to var for which pin to activate
 	switch (act) {
-		case SA_NONE_OPER:
+		case ACTION_NO_ACTION:
 			return true;
-		case SA_BSTR_FIRE:
+		case ACTION_IGNITE:
 			Serial.println("TODO! SA_BSTR_FIRE complete_action");
 			//idk how to do this bc idk how to access pins
 			return false;
-		case SA_SSTR_FIRE:
-			Serial.println("TODO! SA_SSTR_FIRE complete_action");
-			//ditto
-			return false;
-		case SA_STAG_SEPR:
+		case ACTION_STAGE_SEP:
 			Serial.println("TODO! SA_STAG_SEPR complete_action");
 			//ditto
 			return false;
-		case SA_PCHTB_RLSE:
-			Serial.println("TODO! SA_PCHTB_RLSE complete_action");
-			//ditto
-			return false;
-		case SA_PCHTS_RLSE:
-			Serial.println("TODO! SA_PCHTS_RLSE complete_action");
-			//ditto
-			return false;
-		case SA_DROGS_RLSE:
+		case ACTION_DROGUE_RELEASE:
 			Serial.println("TODO! SA_DROGS_RLSE complete_action");
+			//ditto
+			return false;
+		case ACTION_CHUTE_RELEASE:
+			Serial.println("TODO! SA_PCHTS_RLSE complete_action");
 			//ditto
 			return false;
 		default:
@@ -98,20 +89,23 @@ bool complete_action(Action act) {
 }
 
 //Assuming that there will be one board for each stage
-void setupScheduler(bool booster_board) {
+void setupScheduler(BoardType initialization) {
 	Serial.println("Creating initial stage schedule!");
+	attached_to = initialization;
 
 	//Copied directly from Launch Parameters document (currently handling things in meters and degrees)
-	if (booster_board) {
-		add_stage(ST_MANU);
-		add_stage(ST_CDWN);
-		add_stage(ST_NONE, 0, ST_ROTH, 10, SA_BSTR_FIRE); //Expected burnout at 422m, optional to add an empty stage for an abort condition?
-		add_stage(ST_ALTI, 511, ST_NONE, 0, SA_STAG_SEPR); //May need to confirm that the acceleration is dropping
-		add_stage(ST_ALTI, 1118, ST_NONE, 0, SA_PCHTB_RLSE);
-	} else {
-		add_stage(ST_ALTI, 512, ST_ROTH, 60, SA_SSTR_FIRE); //Not sure about this
-		add_stage(ST_ALTI, 3243, ST_AACC, 10, SA_DROGS_RLSE);
-		add_stage(ST_ALTI, 1000, ST_NONE, 0, SA_PCHTS_RLSE);
+	//TODO: Please redo this to be more accurate to state machine
+	if (initialization == BOOSTER) {
+		add_stage(TRIG_MANUAL);
+		add_stage(TRIG_COUNTDOWN);
+		add_stage(TRIG_NO_TRIG, 0, TRIG_NOT_VERTICAL, 30, ACTION_IGNITE); //Expected burnout at 422m, optional to add an empty stage for an abort condition?
+		add_stage(TRIG_ALTITUDE, 511, TRIG_NO_TRIG, 0, ACTION_STAGE_SEP); //May need to confirm that the acceleration is dropping
+		add_stage(TRIG_ABS_ACCELERATION, 100, TRIG_NO_TRIG, 0, ACTION_DROGUE_RELEASE);
+		add_stage(TRIG_ALTITUDE, 1118, TRIG_NO_TRIG, 0, ACTION_CHUTE_RELEASE);
+	} else { //sustainer
+		add_stage(TRIG_ALTITUDE, 512, TRIG_NOT_VERTICAL, 30, ACTION_IGNITE); //Not sure about this
+		add_stage(TRIG_ALTITUDE, 3243, TRIG_NO_TRIG, 0, ACTION_DROGUE_RELEASE);
+		add_stage(TRIG_ALTITUDE, 1000, TRIG_NO_TRIG, 0, ACTION_CHUTE_RELEASE);
 	}
 }
 

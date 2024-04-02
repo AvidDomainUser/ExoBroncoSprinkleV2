@@ -5,40 +5,43 @@
 
 #define MAX_STAGES 15 //reduce to reduce memory usage
 
-enum Stage_Trigger {
-	ST_NONE, //Will trigger on next tick no matter what
-	ST_MANU, //Manual Trigger (waiting for clearance)
-	ST_CDWN, //Countdown Trigger (before initial ignition)
-	ST_ALTI, //Altitude
-	ST_AVEL, //Average Velocity over all axes
-	ST_AACC, //Average Acceleration over all axes
-	ST_ROTH, //Rocket horizontal?
-	ST_COUNT, //For Loops: (int)ST_COUNT
-};
+typedef enum {
+	TRIG_NO_TRIG, //triggers no matter what
+	TRIG_MANUAL,
+	TRIG_COUNTDOWN,
+	TRIG_ALTITUDE,
+	TRIG_ABS_VELOCITY,
+	TRIG_ABS_ACCELERATION,
+	TRIG_NOT_VERTICAL, //Rocket horizontal?
+	TRIG_COUNT, //For Loops: (int)ST_COUNT
+} StageTrigger;
 
-enum Stage_Action {
-	SA_NONE_OPER, //Do nothing
-	SA_BSTR_FIRE, //Begin Booster Ignition
-	SA_SSTR_FIRE, //Begin Sustainer Ignition
-	SA_STAG_SEPR, //Separate Booster and Sustainer Stages
-	SA_PCHTB_RLSE, //Release Parachute on Booster
-	SA_PCHTS_RLSE, //Release Parachute on Sustainer
-	SA_DROGS_RLSE, //Release Drogue Chute (only on sustainer?)
-	SA_COUNT, //For Loops: (int)SA_COUNT
-};
+typedef enum {
+	ACTION_NO_ACTION,
+	ACTION_IGNITE,
+	ACTION_STAGE_SEP,
+	ACTION_DROGUE_RELEASE, 
+	ACTION_CHUTE_RELEASE, //Release Parachute on Booster
+	ACTION_COUNT, //For Loops: (int)SA_COUNT
+} StageAction;
 
+typedef enum {
+	BOOSTER,
+	SUSTAINER
+} BoardType;
 struct Stage {
-	enum Stage_Trigger i_trig; //Initial Trigger
-	float i_cond; //this number depends on the begin type;
+	//TODO: vector
+	StageTrigger trigger;
+	float trigger_condition; //this number depends on the begin type;
 
 	//TODO: make this a vector for multi abort checks?
-	enum Stage_Trigger a_trig; //Abort Trigger
-	float a_cond;
+	enum Stage_Trigger abort_trig; //Abort Trigger
+	float abort_condition;
 
 	enum Stage_Action action;
 };
 
-void setupScheduler(bool booster_board);
+void setupScheduler(BoardType initialization);
 void stepScheduler(DataPacket *pData);
 
 #endif
